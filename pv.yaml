@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: advgke-pv
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 5Gi # Required field, but capacity is technically infinite
+  storageClassName: "" # Important for static provisioning
+  claimRef:
+    name: advgke-pvc
+    namespace: default
+  csi:
+    driver: gcsfuse.csi.storage.gke.io
+    volumeHandle: advgke-pv-handle # Can be any unique string
+    volumeAttributes:
+      bucketName: advgke
+      mountOptions: "implicit-dirs" # Helps with folder structure in buckets
