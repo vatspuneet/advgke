@@ -1,0 +1,76 @@
+# 1. The Persistent Volume (Links K8s to the GCS Bucket)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: advgke-pv
+spec:
+  accessModes:
+  - ReadWriteMany # GCS supports multi-writer
+  capacity:
+    storage: 5Gi # This is a placeholder; GCS is limitless
+  storageClassName: "" # Manual binding
+  claimRef:
+    namespace: default
+    name: advgke-pvc
+  mountOptions:
+    - implicit-dirs # Helps with directory structure mapping in GCS
+  csi:
+    driver: gcsfuse.csi.storage.gke.io
+    # This must match your actual GCS Bucket Name
+    volumeHandle: advgke-pv-handle
+
+---
+# 2. The Persistent Volume Claim (Requesting the storage)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: advgke-pvc
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  volumeName: advgke-pv # Binds directly to the PV above
+  storageClassName: ""
+
+---
+# 3. The Deployment (The Nginx App)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-gcs
+  template:
+    metadata:
+      labels:
+        app: nginx-gcs
+      annotations:
+        # REQUIRED: This tells GKE to inject the GCS FUSE sidecar
+        gke-gcsfuse/volumes: "true"
+    spec:
+      # Ensure the ServiceAccount used here has IAM permissions to read the bucket!
+      # serviceAccountName: <YOUR-KSA-WITH-WORKLOAD-IDENTITY> 
+      containers:
+      - name: nginx
+        image: nginx:latest
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 250m
+            memory: 256Mi
+        volumeMounts:
+        - name: gcs-volume
+          mountPath: /usr/share/nginx/html/data # Mounting bucket inside Nginx
+      volumes:
+      - name: gcs-volume
+        persistentVolumeClaim:
+          claimName: advgke-pvc
