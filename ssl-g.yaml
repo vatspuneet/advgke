@@ -1,0 +1,64 @@
+# 1. Deployment (Appended -g)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment-g
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-g
+  template:
+    metadata:
+      labels:
+        app: nginx-g
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 15
+
+---
+
+# 2. Service (Appended -g)
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service-g
+spec:
+  type: ClusterIP
+  selector:
+    app: nginx-g
+  ports:
+  - port: 80
+    targetPort: 80
+
+---
+
+# 3. Ingress (Appended -g)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-ingress-g
+  annotations:
+    # Use standard GKE Ingress
+    kubernetes.io/ingress.class: "gce"
+    # Link to your Google Managed Certificate named 'cert1'
+    networking.gke.io/managed-certificates: "cert1"
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx-service-g
+            port:
+              number: 80

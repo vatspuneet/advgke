@@ -19,9 +19,9 @@ echo "=== Starting Cleanup for Project: $PROJECT_ID ==="
 echo "[1/4] Deleting Clusters..."
 
 gcloo "Deleting Clusters..."
-gcloud container clusters delete c1-black --region=$REGION_BLACK --project=$PROJECT_ID --quiet &
+gcloud container clusters delete c1s-black --zone=$ZONE_BLACK --project=$PROJECT_ID --quiet &
 PID1=$!
-gcloud container clusters delete c1-white --region=$REGION_WHITE --project=$PROJECT_ID --quiet &
+gcloud container clusters delete c1s-white --zone=$ZONE_WHITE --project=$PROJECT_ID --quiet &
 PID2=$!
 
 wait $PID1 $PID2
