@@ -6,7 +6,7 @@ REGION_BLACK="asia-east1"
 REGION_WHITE="asia-east2"
 
 gcloud config set project $PROJECT_ID
-
+  
 # 1. Setup Networking (VPCs & Subnets)
 echo "=== 1. Creating Networks and Subnets ==="
 gcloud compute networks create vpc-black --subnet-mode=custom --project=$PROJECT_ID
