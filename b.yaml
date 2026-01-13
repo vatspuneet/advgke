@@ -1,0 +1,34 @@
+# 1. BackendConfig (NEW RESOURCE)
+# This forces the Google Cloud Health Check to use HTTPS
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: secure-backend-config
+spec:
+  healthCheck:
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 2
+    type: HTTPS          # <--- Critical: Force HTTPS for the check
+    requestPath: /       # <--- The path to check
+    port: 443            # <--- The port to check
+---
+# 2. Service (UPDATED)
+apiVersion: v1
+kind: Service
+metadata:
+  name: secure-service
+  annotations:
+    # 1. Traffic Protocol
+    cloud.google.com/app-protocols: '{"my-https-port":"HTTPS"}'
+    # 2. Link to the BackendConfig (NEW ANNOTATION)
+    cloud.google.com/backend-config: '{"default": "secure-backend-config"}'
+spec:
+  type: ClusterIP
+  selector:
+    app: secure-nginx
+  ports:
+  - name: my-https-port
+    port: 443
+    targetPort: 443

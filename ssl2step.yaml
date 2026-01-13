@@ -1,0 +1,130 @@
+# 1. BackendConfig (Fixes "Unknown" Status)
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: secure-backend-config
+spec:
+  healthCheck:
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 2
+    type: HTTPS          # Force Google to check via HTTPS
+    requestPath: /
+    port: 443
+---
+# 2. ConfigMap (Nginx SSL & Logging)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-ssl-config
+data:
+  default.conf: |
+    # Log format to prove encryption (captures SSL Protocol)
+    log_format ssl_logs '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$ssl_protocol" "$ssl_cipher"';
+
+    server {
+        listen 443 ssl;
+        server_name localhost;
+
+        ssl_certificate /etc/nginx/ssl/tls.crt;
+        ssl_certificate_key /etc/nginx/ssl/tls.key;
+        ssl_protocols TLSv1.2 TLSv1.3;
+
+        access_log /var/log/nginx/access.log ssl_logs;
+
+        location / {
+            root /usr/share/nginx/html;
+            index index.html index.htm;
+            return 200 "Secure End-to-End Connection Successful!\n";
+        }
+    }
+---
+# 3. Deployment (The App)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: secure-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: secure-nginx
+  template:
+    metadata:
+      labels:
+        app: secure-nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 443
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
+          readOnly: true
+        - name: backend-certs
+          mountPath: /etc/nginx/ssl
+          readOnly: true
+        # Internal Probes (K8s checking the Pod)
+        livenessProbe:
+          httpGet:           # Use httpGet with scheme: HTTPS
+            path: /
+            port: 443
+            scheme: HTTPS
+          initialDelaySeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 443
+            scheme: HTTPS
+          initialDelaySeconds: 5
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: nginx-ssl-config
+      - name: backend-certs
+        secret:
+          secretName: backend-tls
+---
+# 4. Service (The Bridge)
+apiVersion: v1
+kind: Service
+metadata:
+  name: secure-service
+  annotations:
+    # 1. Traffic Protocol: HTTPS
+    cloud.google.com/app-protocols: '{"my-https-port":"HTTPS"}'
+    # 2. Health Check Config: Link to BackendConfig above
+    cloud.google.com/backend-config: '{"default": "secure-backend-config"}'
+spec:
+  type: ClusterIP
+  selector:
+    app: secure-nginx
+  ports:
+  - name: my-https-port
+    port: 443
+    targetPort: 443
+---
+# 5. Ingress (The Entrypoint)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: secure-ingress
+spec:
+  ingressClassName: "gce"
+  tls:
+  - secretName: frontend-tls
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: secure-service
+            port:
+              number: 443
