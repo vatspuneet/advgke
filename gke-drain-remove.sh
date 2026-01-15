@@ -23,3 +23,11 @@ gcloud container clusters resize $CLUSTER_NAME \
 echo "Node removed"
 kubectl get nodes
 kubectl get pods -o wide
+
+
+# Status Lifecycle (in order):
+# Ready - Node is healthy and accepting pods
+# Ready,SchedulingDisabled - Node is cordoned (kubectl cordon), no new pods scheduled but existing pods still running
+# Ready,SchedulingDisabled - Draining in progress (kubectl drain), pods being evicted
+# NotReady,SchedulingDisabled - Node is shutting down, kubelet stopping
+# Node removed - Node object deleted from cluster
