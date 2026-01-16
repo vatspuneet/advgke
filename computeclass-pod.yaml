@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-e2medium
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-e2medium
+  template:
+    metadata:
+      labels:
+        app: nginx-e2medium
+    spec:
+      nodeSelector:
+        cloud.google.com/compute-class: e2-medium-class
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
