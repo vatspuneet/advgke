@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gcs-pod1
+  annotations:
+    gke-gcsfuse/volumes: "true"
+spec:
+  serviceAccountName: gcs-sa
+  containers:
+    - name: app
+      image: busybox
+      command: ["sleep", "infinity"]
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      csi:
+        driver: gcsfuse.csi.storage.gke.io
+        volumeAttributes:
+          bucketName: BUCKET_NAME
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gcs-pod2
+  annotations:
+    gke-gcsfuse/volumes: "true"
+spec:
+  serviceAccountName: gcs-sa
+  containers:
+    - name: app
+      image: busybox
+      command: ["sleep", "infinity"]
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      csi:
+        driver: gcsfuse.csi.storage.gke.io
+        volumeAttributes:
+          bucketName: BUCKET_NAME
