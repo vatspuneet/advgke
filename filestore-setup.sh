@@ -4,7 +4,7 @@ set -e
 PROJECT_ID=$(gcloud config get-value project)
 REGION="us-central1"
 ZONE="us-central1-a"
-CLUSTER_NAME="filestore-autopilot"
+CLUSTER_NAME="storage-autopilot"
 FILESTORE_NAME="filestore-demo"
 NETWORK="default"
 
@@ -15,10 +15,10 @@ gcloud filestore instances create $FILESTORE_NAME \
   --file-share=name=vol1,capacity=1TB \
   --network=name=$NETWORK
 
-echo "Creating GKE Autopilot cluster..."
+echo "Creating GKE Autopilot cluster (skip if exists)..."
 gcloud container clusters create-auto $CLUSTER_NAME \
   --region=$REGION \
-  --project=$PROJECT_ID
+  --project=$PROJECT_ID || true
 
 echo "Getting cluster credentials..."
 gcloud container clusters get-credentials $CLUSTER_NAME --region=$REGION
