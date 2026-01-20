@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+# pki with gateway api
+
 PROJECT_ID=$(gcloud config get-value project)
 REGION="us-central1"
 CLUSTER_NAME="pki-demo"

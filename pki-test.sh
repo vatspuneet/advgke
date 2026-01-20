@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash# pki with gateway api
 
 STATIC_IP=$(gcloud compute addresses describe pki-demo-ip --global --format="value(address)")
 
