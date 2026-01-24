@@ -23,11 +23,13 @@ kubectl delete pod unsigned-test --ignore-not-found --wait=false
 # Test 2: Build and push using Cloud Build
 echo ""
 echo "[Test 2] Building and pushing image via Cloud Build..."
-cat > /tmp/Dockerfile <<EOF
+BUILD_DIR=$(mktemp -d)
+cat > $BUILD_DIR/Dockerfile <<EOF
 FROM nginx:alpine
 RUN echo "Signed image" > /usr/share/nginx/html/index.html
 EOF
-gcloud builds submit /tmp --tag $TEST_IMAGE --quiet
+gcloud builds submit $BUILD_DIR --tag $TEST_IMAGE --quiet
+rm -rf $BUILD_DIR
 
 # Get image digest
 DIGEST=$(gcloud artifacts docker images describe $TEST_IMAGE --format='get(image_summary.digest)')
