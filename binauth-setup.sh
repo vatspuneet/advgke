@@ -23,7 +23,7 @@ if ! gcloud artifacts repositories describe binauth-repo --location=$REGION &>/d
 fi
 
 # 3. Create KMS key for signing
-echo "[3/7] Creating KMS key...
+echo "[3/7] Creating KMS key..."
 if ! gcloud kms keyrings describe $KMS_KEYRING --location=$REGION &>/dev/null; then
     gcloud kms keyrings create $KMS_KEYRING --location=$REGION
 fi
