@@ -40,11 +40,15 @@ fi
 if ! gcloud kms keys describe $KMS_KEY --keyring=$KMS_KEYRING --location=$REGION &>/dev/null; then
     gcloud kms keys create $KMS_KEY --keyring=$KMS_KEYRING --location=$REGION --purpose=asymmetric-signing --default-algorithm=ec-sign-p256-sha256
 fi
-# Restore key if destroyed
+# Ensure key version is enabled
 KEY_STATE=$(gcloud kms keys versions describe 1 --key=$KMS_KEY --keyring=$KMS_KEYRING --location=$REGION --format='value(state)' 2>/dev/null || echo "")
 if [ "$KEY_STATE" = "DESTROY_SCHEDULED" ] || [ "$KEY_STATE" = "DESTROYED" ]; then
     echo "Restoring KMS key version..."
     gcloud kms keys versions restore 1 --key=$KMS_KEY --keyring=$KMS_KEYRING --location=$REGION
+fi
+if [ "$KEY_STATE" = "DISABLED" ]; then
+    echo "Enabling KMS key version..."
+    gcloud kms keys versions enable 1 --key=$KMS_KEY --keyring=$KMS_KEYRING --location=$REGION
 fi
 
 # 5. Create Container Analysis Note

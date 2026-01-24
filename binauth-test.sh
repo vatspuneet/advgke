@@ -59,9 +59,13 @@ yes | gcloud beta container binauthz attestations sign-and-create \
 echo ""
 echo "[Test 3] Deploying SIGNED image (SHOULD SUCCEED)"
 kubectl delete pod signed-test --ignore-not-found --wait=false 2>/dev/null
-kubectl run signed-test --image=$IMAGE_PATH --restart=Never
-kubectl wait --for=condition=ready pod/signed-test --timeout=120s
-echo "Signed image deployed successfully!"
+sleep 2
+if kubectl run signed-test --image=$IMAGE_PATH --restart=Never; then
+    kubectl wait --for=condition=ready pod/signed-test --timeout=120s && echo "PASSED: Signed image deployed!"
+else
+    echo "FAILED: Signed image was blocked"
+    exit 1
+fi
 
 echo ""
 echo "=== All Tests Passed ==="
