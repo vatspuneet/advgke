@@ -14,7 +14,7 @@ echo "=== Binary Authorization Demo ==="
 
 # 1. Enable APIs
 echo "[1/7] Enabling APIs..."
-gcloud services enable container.googleapis.com binaryauthorization.googleapis.com containeranalysis.googleapis.com cloudkms.googleapis.com artifactregistry.googleapis.com --quiet
+gcloud services enable container.googleapis.com binaryauthorization.googleapis.com containeranalysis.googleapis.com cloudkms.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com --quiet
 
 # 2. Create Artifact Registry
 echo "[2/7] Creating Artifact Registry..."
