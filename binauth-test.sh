@@ -1,0 +1,55 @@
+#!/bin/bash
+
+PROJECT_ID=$(gcloud config get-value project)
+REGION="asia-east2"
+ZONE="asia-east2-a"
+ATTESTOR_ID="demo-attestor"
+KMS_KEYRING="binauth-keyring"
+KMS_KEY="binauth-key"
+TEST_IMAGE="gcr.io/$PROJECT_ID/binauth-test:v1"
+
+echo "=== Binary Authorization Tests ==="
+
+# Test 1: Deploy unsigned image (should fail)
+echo ""
+echo "[Test 1] Deploying UNSIGNED image (SHOULD FAIL)"
+kubectl run unsigned-test --image=nginx:alpine --restart=Never 2>&1 || true
+kubectl delete pod unsigned-test --ignore-not-found --wait=false
+
+# Test 2: Build, push and sign an image
+echo ""
+echo "[Test 2] Building, pushing and signing image..."
+cat > /tmp/Dockerfile <<EOF
+FROM nginx:alpine
+RUN echo "Signed image" > /usr/share/nginx/html/index.html
+EOF
+docker build -t $TEST_IMAGE /tmp -f /tmp/Dockerfile
+docker push $TEST_IMAGE
+
+# Get image digest
+DIGEST=$(gcloud container images describe $TEST_IMAGE --format='get(image_summary.digest)')
+IMAGE_PATH="gcr.io/$PROJECT_ID/binauth-test@$DIGEST"
+
+echo "Creating attestation for: $IMAGE_PATH"
+gcloud beta container binauthz attestations sign-and-create \
+    --artifact-url=$IMAGE_PATH \
+    --attestor=$ATTESTOR_ID \
+    --attestor-project=$PROJECT_ID \
+    --keyversion-project=$PROJECT_ID \
+    --keyversion-location=$REGION \
+    --keyversion-keyring=$KMS_KEYRING \
+    --keyversion-key=$KMS_KEY \
+    --keyversion=1
+
+# Test 3: Deploy signed image (should succeed)
+echo ""
+echo "[Test 3] Deploying SIGNED image (SHOULD SUCCEED)"
+kubectl run signed-test --image=$IMAGE_PATH --restart=Never
+kubectl wait --for=condition=ready pod/signed-test --timeout=120s
+echo "Signed image deployed successfully!"
+
+echo ""
+echo "=== Tests Complete ==="
+echo ""
+echo "View Binary Authorization events:"
+echo "gcloud logging read 'resource.type=\"k8s_cluster\" protoPayload.response.reason=\"VIOLATES_POLICY\"' --project=$PROJECT_ID --limit=10"
