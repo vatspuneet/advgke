@@ -20,15 +20,14 @@ echo "[Test 1] Deploying UNSIGNED image (SHOULD FAIL)"
 kubectl run unsigned-test --image=nginx:alpine --restart=Never 2>&1 || true
 kubectl delete pod unsigned-test --ignore-not-found --wait=false
 
-# Test 2: Build, push and sign an image
+# Test 2: Build and push using Cloud Build
 echo ""
-echo "[Test 2] Building, pushing and signing image..."
+echo "[Test 2] Building and pushing image via Cloud Build..."
 cat > /tmp/Dockerfile <<EOF
 FROM nginx:alpine
 RUN echo "Signed image" > /usr/share/nginx/html/index.html
 EOF
-docker build -t $TEST_IMAGE /tmp -f /tmp/Dockerfile
-docker push $TEST_IMAGE
+gcloud builds submit /tmp --tag $TEST_IMAGE --quiet
 
 # Get image digest
 DIGEST=$(gcloud artifacts docker images describe $TEST_IMAGE --format='get(image_summary.digest)')
