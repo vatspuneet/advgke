@@ -39,16 +39,20 @@ if ! gcloud kms keyrings describe $KMS_KEYRING --location=$REGION &>/dev/null; t
 fi
 if ! gcloud kms keys describe $KMS_KEY --keyring=$KMS_KEYRING --location=$REGION &>/dev/null; then
     gcloud kms keys create $KMS_KEY --keyring=$KMS_KEYRING --location=$REGION --purpose=asymmetric-signing --default-algorithm=ec-sign-p256-sha256
-fi
-# Ensure key version is enabled
-KEY_STATE=$(gcloud kms keys versions describe 1 --key=$KMS_KEY --keyring=$KMS_KEYRING --location=$REGION --format='value(state)' 2>/dev/null || echo "")
-if [ "$KEY_STATE" = "DESTROY_SCHEDULED" ] || [ "$KEY_STATE" = "DESTROYED" ]; then
-    echo "Restoring KMS key version..."
-    gcloud kms keys versions restore 1 --key=$KMS_KEY --keyring=$KMS_KEYRING --location=$REGION
-fi
-if [ "$KEY_STATE" = "DISABLED" ]; then
-    echo "Enabling KMS key version..."
-    gcloud kms keys versions enable 1 --key=$KMS_KEY --keyring=$KMS_KEYRING --location=$REGION
+else
+    # Ensure key version is enabled
+    KEY_STATE=$(gcloud kms keys versions describe 1 --key=$KMS_KEY --keyring=$KMS_KEYRING --location=$REGION --format='value(state)')
+    case "$KEY_STATE" in
+        DESTROY_SCHEDULED|DESTROYED)
+            echo "Restoring KMS key version..."
+            gcloud kms keys versions restore 1 --key=$KMS_KEY --keyring=$KMS_KEYRING --location=$REGION
+            gcloud kms keys versions enable 1 --key=$KMS_KEY --keyring=$KMS_KEYRING --location=$REGION
+            ;;
+        DISABLED)
+            echo "Enabling KMS key version..."
+            gcloud kms keys versions enable 1 --key=$KMS_KEY --keyring=$KMS_KEYRING --location=$REGION
+            ;;
+    esac
 fi
 
 # 5. Create Container Analysis Note
@@ -61,12 +65,17 @@ curl -s -X POST "https://containeranalysis.googleapis.com/v1/projects/$PROJECT_I
     -H "Content-Type: application/json" \
     -d @/tmp/note.json || true
 
-# 6. Create Attestor
+# 6. Create Attestor and add public key
 echo "[6/8] Creating Attestor..."
 if ! gcloud container binauthz attestors describe $ATTESTOR_ID --project=$PROJECT_ID &>/dev/null; then
     gcloud container binauthz attestors create $ATTESTOR_ID \
         --attestation-authority-note=$NOTE_ID \
         --attestation-authority-note-project=$PROJECT_ID
+fi
+# Remove existing keys and re-add to ensure it's current
+EXISTING_KEY=$(gcloud container binauthz attestors describe $ATTESTOR_ID --format='value(userOwnedGrafeasNote.publicKeys[0].id)' 2>/dev/null || echo "")
+if [ -n "$EXISTING_KEY" ]; then
+    gcloud container binauthz attestors public-keys remove $EXISTING_KEY --attestor=$ATTESTOR_ID --quiet 2>/dev/null || true
 fi
 gcloud container binauthz attestors public-keys add \
     --attestor=$ATTESTOR_ID \
@@ -74,7 +83,7 @@ gcloud container binauthz attestors public-keys add \
     --keyversion-location=$REGION \
     --keyversion-keyring=$KMS_KEYRING \
     --keyversion-key=$KMS_KEY \
-    --keyversion=1 2>/dev/null || true
+    --keyversion=1
 
 # 7. Create GKE cluster with Binary Authorization
 echo "[7/8] Creating GKE Autopilot cluster with Binary Authorization..."

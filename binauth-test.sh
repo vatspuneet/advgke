@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 PROJECT_ID=$(gcloud config get-value project)
 REGION="asia-east2"
@@ -26,8 +27,12 @@ gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
 # Test 1: Deploy unsigned image (should fail)
 echo ""
 echo "[Test 1] Deploying UNSIGNED image (SHOULD FAIL)"
-kubectl run unsigned-test --image=nginx:alpine --restart=Never 2>&1 || true
-kubectl delete pod unsigned-test --ignore-not-found --wait=false
+if kubectl run unsigned-test --image=nginx:alpine --restart=Never 2>&1 | grep -q "VIOLATES_POLICY"; then
+    echo "PASSED: Unsigned image blocked"
+else
+    echo "WARNING: Unsigned image may not have been blocked properly"
+fi
+kubectl delete pod unsigned-test --ignore-not-found --wait=false 2>/dev/null || true
 
 # Test 2: Build and push using Cloud Build
 echo ""
