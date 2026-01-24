@@ -36,7 +36,7 @@ curl -s -X DELETE "https://containeranalysis.googleapis.com/v1/projects/$PROJECT
 
 # Delete container image
 echo "Deleting test image..."
-gcloud container images delete gcr.io/$PROJECT_ID/binauth-test --force-delete-tags --quiet 2>/dev/null || true
+gcloud artifacts docker images delete $REGION-docker.pkg.dev/$PROJECT_ID/binauth-repo/binauth-test --delete-tags --quiet 2>/dev/null || true
 
 # Note: KMS keys cannot be deleted immediately (scheduled for destruction)
 echo "Scheduling KMS key destruction..."

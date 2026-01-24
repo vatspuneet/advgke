@@ -6,9 +6,13 @@ ZONE="asia-east2-a"
 ATTESTOR_ID="demo-attestor"
 KMS_KEYRING="binauth-keyring"
 KMS_KEY="binauth-key"
-TEST_IMAGE="gcr.io/$PROJECT_ID/binauth-test:v1"
+AR_REPO="$REGION-docker.pkg.dev/$PROJECT_ID/binauth-repo"
+TEST_IMAGE="$AR_REPO/binauth-test:v1"
 
 echo "=== Binary Authorization Tests ==="
+
+# Configure docker for Artifact Registry
+gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
 
 # Test 1: Deploy unsigned image (should fail)
 echo ""
@@ -27,8 +31,8 @@ docker build -t $TEST_IMAGE /tmp -f /tmp/Dockerfile
 docker push $TEST_IMAGE
 
 # Get image digest
-DIGEST=$(gcloud container images describe $TEST_IMAGE --format='get(image_summary.digest)')
-IMAGE_PATH="gcr.io/$PROJECT_ID/binauth-test@$DIGEST"
+DIGEST=$(gcloud artifacts docker images describe $TEST_IMAGE --format='get(image_summary.digest)')
+IMAGE_PATH="$AR_REPO/binauth-test@$DIGEST"
 
 echo "Creating attestation for: $IMAGE_PATH"
 gcloud beta container binauthz attestations sign-and-create \

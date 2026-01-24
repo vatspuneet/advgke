@@ -13,11 +13,17 @@ KMS_KEY="binauth-key"
 echo "=== Binary Authorization Demo ==="
 
 # 1. Enable APIs
-echo "[1/6] Enabling APIs..."
-gcloud services enable container.googleapis.com binaryauthorization.googleapis.com containeranalysis.googleapis.com cloudkms.googleapis.com --quiet
+echo "[1/7] Enabling APIs..."
+gcloud services enable container.googleapis.com binaryauthorization.googleapis.com containeranalysis.googleapis.com cloudkms.googleapis.com artifactregistry.googleapis.com --quiet
 
-# 2. Create KMS key for signing
-echo "[2/6] Creating KMS key..."
+# 2. Create Artifact Registry
+echo "[2/7] Creating Artifact Registry..."
+if ! gcloud artifacts repositories describe binauth-repo --location=$REGION &>/dev/null; then
+    gcloud artifacts repositories create binauth-repo --repository-format=docker --location=$REGION
+fi
+
+# 3. Create KMS key for signing
+echo "[3/7] Creating KMS key...
 if ! gcloud kms keyrings describe $KMS_KEYRING --location=$REGION &>/dev/null; then
     gcloud kms keyrings create $KMS_KEYRING --location=$REGION
 fi
@@ -25,8 +31,8 @@ if ! gcloud kms keys describe $KMS_KEY --keyring=$KMS_KEYRING --location=$REGION
     gcloud kms keys create $KMS_KEY --keyring=$KMS_KEYRING --location=$REGION --purpose=asymmetric-signing --default-algorithm=ec-sign-p256-sha256
 fi
 
-# 3. Create Container Analysis Note
-echo "[3/6] Creating Attestor Note..."
+# 4. Create Container Analysis Note
+echo "[4/7] Creating Attestor Note..."
 cat > /tmp/note.json <<EOF
 {"attestation":{"hint":{"human_readable_name":"Demo Attestor Note"}}}
 EOF
@@ -35,8 +41,8 @@ curl -s -X POST "https://containeranalysis.googleapis.com/v1/projects/$PROJECT_I
     -H "Content-Type: application/json" \
     -d @/tmp/note.json || true
 
-# 4. Create Attestor
-echo "[4/6] Creating Attestor..."
+# 5. Create Attestor
+echo "[5/7] Creating Attestor..."
 if ! gcloud container binauthz attestors describe $ATTESTOR_ID --project=$PROJECT_ID &>/dev/null; then
     gcloud container binauthz attestors create $ATTESTOR_ID \
         --attestation-authority-note=$NOTE_ID \
@@ -50,8 +56,8 @@ gcloud container binauthz attestors public-keys add \
     --keyversion-key=$KMS_KEY \
     --keyversion=1 2>/dev/null || true
 
-# 5. Create GKE cluster with Binary Authorization
-echo "[5/6] Creating GKE Autopilot cluster with Binary Authorization..."
+# 6. Create GKE cluster with Binary Authorization
+echo "[6/7] Creating GKE Autopilot cluster with Binary Authorization..."
 if ! gcloud container clusters describe $CLUSTER_NAME --region=$REGION &>/dev/null; then
     gcloud container clusters create-auto $CLUSTER_NAME \
         --region=$REGION \
@@ -59,8 +65,8 @@ if ! gcloud container clusters describe $CLUSTER_NAME --region=$REGION &>/dev/nu
 fi
 gcloud container clusters get-credentials $CLUSTER_NAME --region=$REGION
 
-# 6. Configure Binary Authorization Policy
-echo "[6/6] Configuring Binary Authorization Policy..."
+# 7. Configure Binary Authorization Policy
+echo "[7/7] Configuring Binary Authorization Policy..."
 cat > /tmp/policy.yaml <<EOF
 defaultAdmissionRule:
   evaluationMode: REQUIRE_ATTESTATION
