@@ -13,26 +13,42 @@ KMS_KEY="binauth-key"
 echo "=== Binary Authorization Demo ==="
 
 # 1. Enable APIs
-echo "[1/7] Enabling APIs..."
+echo "[1/8] Enabling APIs..."
 gcloud services enable container.googleapis.com binaryauthorization.googleapis.com containeranalysis.googleapis.com cloudkms.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com --quiet
 
-# 2. Create Artifact Registry
-echo "[2/7] Creating Artifact Registry..."
+# 2. Grant Cloud Build permissions
+echo "[2/8] Granting Cloud Build permissions..."
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+    --role="roles/artifactregistry.writer" --quiet
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+    --role="roles/storage.admin" --quiet
+
+# 3. Create Artifact Registry
+echo "[3/8] Creating Artifact Registry..."
 if ! gcloud artifacts repositories describe binauth-repo --location=$REGION &>/dev/null; then
     gcloud artifacts repositories create binauth-repo --repository-format=docker --location=$REGION
 fi
 
-# 3. Create KMS key for signing
-echo "[3/7] Creating KMS key..."
+# 4. Create KMS key for signing
+echo "[4/8] Creating KMS key..."
 if ! gcloud kms keyrings describe $KMS_KEYRING --location=$REGION &>/dev/null; then
     gcloud kms keyrings create $KMS_KEYRING --location=$REGION
 fi
 if ! gcloud kms keys describe $KMS_KEY --keyring=$KMS_KEYRING --location=$REGION &>/dev/null; then
     gcloud kms keys create $KMS_KEY --keyring=$KMS_KEYRING --location=$REGION --purpose=asymmetric-signing --default-algorithm=ec-sign-p256-sha256
 fi
+# Restore key if destroyed
+KEY_STATE=$(gcloud kms keys versions describe 1 --key=$KMS_KEY --keyring=$KMS_KEYRING --location=$REGION --format='value(state)' 2>/dev/null || echo "")
+if [ "$KEY_STATE" = "DESTROY_SCHEDULED" ] || [ "$KEY_STATE" = "DESTROYED" ]; then
+    echo "Restoring KMS key version..."
+    gcloud kms keys versions restore 1 --key=$KMS_KEY --keyring=$KMS_KEYRING --location=$REGION
+fi
 
-# 4. Create Container Analysis Note
-echo "[4/7] Creating Attestor Note..."
+# 5. Create Container Analysis Note
+echo "[5/8] Creating Attestor Note..."
 cat > /tmp/note.json <<EOF
 {"attestation":{"hint":{"human_readable_name":"Demo Attestor Note"}}}
 EOF
@@ -41,8 +57,8 @@ curl -s -X POST "https://containeranalysis.googleapis.com/v1/projects/$PROJECT_I
     -H "Content-Type: application/json" \
     -d @/tmp/note.json || true
 
-# 5. Create Attestor
-echo "[5/7] Creating Attestor..."
+# 6. Create Attestor
+echo "[6/8] Creating Attestor..."
 if ! gcloud container binauthz attestors describe $ATTESTOR_ID --project=$PROJECT_ID &>/dev/null; then
     gcloud container binauthz attestors create $ATTESTOR_ID \
         --attestation-authority-note=$NOTE_ID \
@@ -56,8 +72,8 @@ gcloud container binauthz attestors public-keys add \
     --keyversion-key=$KMS_KEY \
     --keyversion=1 2>/dev/null || true
 
-# 6. Create GKE cluster with Binary Authorization
-echo "[6/7] Creating GKE Autopilot cluster with Binary Authorization..."
+# 7. Create GKE cluster with Binary Authorization
+echo "[7/8] Creating GKE Autopilot cluster with Binary Authorization..."
 if ! gcloud container clusters describe $CLUSTER_NAME --region=$REGION &>/dev/null; then
     gcloud container clusters create-auto $CLUSTER_NAME \
         --region=$REGION \
@@ -65,8 +81,8 @@ if ! gcloud container clusters describe $CLUSTER_NAME --region=$REGION &>/dev/nu
 fi
 gcloud container clusters get-credentials $CLUSTER_NAME --region=$REGION
 
-# 7. Configure Binary Authorization Policy
-echo "[7/7] Configuring Binary Authorization Policy..."
+# 8. Configure Binary Authorization Policy
+echo "[8/8] Configuring Binary Authorization Policy..."
 cat > /tmp/policy.yaml <<EOF
 defaultAdmissionRule:
   evaluationMode: REQUIRE_ATTESTATION

@@ -11,6 +11,15 @@ TEST_IMAGE="$AR_REPO/binauth-test:v1"
 
 echo "=== Binary Authorization Tests ==="
 
+# Grant Cloud Build permissions if needed
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+    --role="roles/artifactregistry.writer" --quiet 2>/dev/null
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+    --role="roles/storage.admin" --quiet 2>/dev/null
+
 # Configure docker for Artifact Registry
 gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
 
@@ -36,7 +45,7 @@ DIGEST=$(gcloud artifacts docker images describe $TEST_IMAGE --format='get(image
 IMAGE_PATH="$AR_REPO/binauth-test@$DIGEST"
 
 echo "Creating attestation for: $IMAGE_PATH"
-gcloud beta container binauthz attestations sign-and-create \
+yes | gcloud beta container binauthz attestations sign-and-create \
     --artifact-url=$IMAGE_PATH \
     --attestor=$ATTESTOR_ID \
     --attestor-project=$PROJECT_ID \
@@ -49,12 +58,13 @@ gcloud beta container binauthz attestations sign-and-create \
 # Test 3: Deploy signed image (should succeed)
 echo ""
 echo "[Test 3] Deploying SIGNED image (SHOULD SUCCEED)"
+kubectl delete pod signed-test --ignore-not-found --wait=false 2>/dev/null
 kubectl run signed-test --image=$IMAGE_PATH --restart=Never
 kubectl wait --for=condition=ready pod/signed-test --timeout=120s
 echo "Signed image deployed successfully!"
 
 echo ""
-echo "=== Tests Complete ==="
+echo "=== All Tests Passed ==="
 echo ""
 echo "View Binary Authorization events:"
 echo "gcloud logging read 'resource.type=\"k8s_cluster\" protoPayload.response.reason=\"VIOLATES_POLICY\"' --project=$PROJECT_ID --limit=10"
