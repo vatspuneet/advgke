@@ -1,8 +1,9 @@
 #!/bin/bash
 
 PROJECT_ID=$(gcloud config get-value project)
-REGION="us-central1"
-CLUSTER_NAME="rbac-autopilot"
+REGION="me-central1"
+ZONE="me-central1-a"
+CLUSTER_NAME="security-cluster"
 
 echo "Deleting deployments and services..."
 kubectl delete deployment app1 -n app1 --ignore-not-found
@@ -31,6 +32,6 @@ for SA in team1-support team1-dev team2-support team2-dev; do
 done
 
 # echo "Deleting GKE cluster..."
-# gcloud container clusters delete $CLUSTER_NAME --region=$REGION --quiet || true
+# gcloud container clusters delete $CLUSTER_NAME --zone=$ZONE --quiet || true
 
 echo "Cleanup complete!"

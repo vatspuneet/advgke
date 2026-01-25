@@ -2,16 +2,21 @@
 set -e
 
 PROJECT_ID=$(gcloud config get-value project)
-REGION="us-central1"
-CLUSTER_NAME="rbac-autopilot"
+REGION="me-central1"
+ZONE="me-central1-a"
+CLUSTER_NAME="security-cluster"
 
-# STEP 1: Create GKE Autopilot cluster with Workload Identity enabled by default
-echo "Creating GKE Autopilot cluster..."
-gcloud container clusters create-auto $CLUSTER_NAME \
-  --region=$REGION \
-  --project=$PROJECT_ID || true
+# STEP 1: Get credentials for existing cluster (cluster creation commented out)
+echo "Getting credentials for existing cluster..."
+# gcloud container clusters create $CLUSTER_NAME \
+#   --region=$REGION \
+#   --project=$PROJECT_ID \
+#   --num-nodes=1 \
+#   --workload-pool=$PROJECT_ID.svc.id.goog \
+#   --enable-dataplane-v2 \
+#   --enable-dataplane-v2-flow-observability || true
 
-gcloud container clusters get-credentials $CLUSTER_NAME --region=$REGION
+gcloud container clusters get-credentials $CLUSTER_NAME --zone=$ZONE
 
 # STEP 2: Create namespaces to isolate team1 (app1) and team2 (app2)
 echo "Creating namespaces..."
